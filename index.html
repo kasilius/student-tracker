@@ -110,165 +110,160 @@
         // ⚠️ ضع بيانات JSONBin هنا
         const BIN_ID = '69fe0a8f250b1311c3211460';
         const MASTER_KEY = '$2a$10$raOJsTvWlksftZDI6t2.le12jC6bNEmslW3FR1h5FBeKo2WaimfEi';
-        const API_URL = `https://api.jsonbin.io/v3/b/${BIN_ID}`;
+    const API_URL = `https://api.jsonbin.io/v3/b/${BIN_ID}`;
 
-        const { createApp } = Vue;
+    const { createApp } = Vue;
 
-        createApp({
-            data() {
-                return {
-                    currentDate: new Date().toLocaleDateString('ar-SA', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' }),
-                    showAddModal: false,
-                    isLoading: true,
-                    isSaving: false,
-                    newStudent: { name: '', studentId: '', color: 'green' },
-                    students: [],
-                    refreshInterval: null
-                }
-            },
-            computed: {
-                achievementStudents() { return this.students.filter(s => s.achievement).length; },
-                cooperationStudents() { return this.students.filter(s => s.cooperation).length; },
-                participationStudents() { return this.students.filter(s => s.participation).length; },
-                participation2Students() { return this.students.filter(s => s.participation2).length; },
-                participation3Students() { return this.students.filter(s => s.participation3).length; },
-                achievementPercentage() { return this.calcPercent(this.achievementStudents); },
-                cooperationPercentage() { return this.calcPercent(this.cooperationStudents); },
-                participationPercentage() { return this.calcPercent(this.participationStudents); },
-                participation2Percentage() { return this.calcPercent(this.participation2Students); },
-                participation3Percentage() { return this.calcPercent(this.participation3Students); }
-            },
-            methods: {
-                calcPercent(count) { return this.students.length ? Math.round((count / this.students.length) * 100) : 0; },
-                toggleStatus(student, status) { 
-                    student[status] = !student[status]; 
-                    this.saveToCloud(); 
-                },
-                studentClass(color) { return 'student-' + color; },
-                
-                // جلب البيانات من السحابة
-                async loadFromCloud() {
-                    if (this.isSaving) return; // لا تحمل أثناء الحفظ
-                    
-                    try {
-                        const response = await fetch(`${API_URL}/latest`, {
-                            headers: { 'X-Master-Key': MASTER_KEY }
-                        });
-                        
-                        if (!response.ok) throw new Error('فشل في الاتصال');
-                        
-                        const data = await response.json();
-                        this.students = data.record || [];
-                    } catch (error) {
-                        console.error('خطأ في التحميل:', error);
-                    } finally {
-                        this.isLoading = false;
-                    }
-                },
-
-                // حفظ البيانات للسحابة
-                async saveToCloud() {
-                    if (this.isSaving) return; // منع الحفظ المتكرر
-                    
-                    this.isSaving = true;
-                    this.isLoading = true;
-                    
-                    try {
-                        const response = await fetch(API_URL, {
-                            method: 'PUT',
-                            headers: { 
-                                'Content-Type': 'application/json',
-                                'X-Master-Key': MASTER_KEY,
-                                'X-Bin-Meta': 'false'
-                            },
-                            body: JSON.stringify(this.students)
-                        });
-                        
-                        if (!response.ok) throw new Error('فشل في الحفظ');
-                        
-                        console.log('✅ تم الحفظ بنجاح');
-                    } catch (error) {
-                        console.error('❌ خطأ في الحفظ:', error);
-                        alert('فشل الحفظ: ' + error.message);
-                    } finally {
-                        this.isSaving = false;
-                        this.isLoading = false;
-                    }
-                },
-
-                // إضافة طالب جديد
-                async addStudent() {
-                    if (!this.newStudent.name || !this.newStudent.studentId) {
-                        alert('الرجاء إدخال اسم الطالب ورقمه');
-                        return;
-                    }
-                    
-                    const newStudent = {
-                        id: Date.now(),
-                        name: this.newStudent.name,
-                        studentId: this.newStudent.studentId,
-                        color: this.newStudent.color,
-                        achievement: false,
-                        cooperation: false,
-                        participation: false,
-                        participation2: false,
-                        participation3: false,
-                        notes: ''
-                    };
-                    
-                    // أضف محلياً فوراً
-                    this.students.push(newStudent);
-                    
-                    // احفظ في السحابة
-                    await this.saveToCloud();
-                    
-                    // نظّف النموذج
-                    this.newStudent = { name: '', studentId: '', color: 'green' };
-                    this.showAddModal = false;
-                },
-
-                // حذف طالب
-                async deleteStudent(student) {
-                    if (!confirm('هل أنت متأكد من حذف هذا الطالب؟')) return;
-                    
-                    const index = this.students.findIndex(s => s.id === student.id);
-                    if (index === -1) return;
-                    
-                    // احذف محلياً
-                    this.students.splice(index, 1);
-                    
-                    // احفظ في السحابة
-                    await this.saveToCloud();
-                },
-
-                // حذف جميع البيانات
-                async clearAllData() {
-                    if (!confirm('⚠️ هل أنت متأكد من حذف جميع البيانات؟ هذا الإجراء لا يمكن التراجع عنه!')) return;
-                    
-                    this.students = [];
-                    await this.saveToCloud();
-                },
-
-                // بدء المزامنة الدورية
-                startSync() {
-                    // حدّث كل 10 ثوانٍ (بدلاً من 5 لتجنب الضغط على API)
-                    this.refreshInterval = setInterval(() => {
-                        if (!this.isSaving) {
-                            this.loadFromCloud();
-                        }
-                    }, 10000);
-                }
-            },
-            mounted() {
-                this.loadFromCloud();
-                this.startSync();
-            },
-            beforeUnmount() {
-                if (this.refreshInterval) {
-                    clearInterval(this.refreshInterval);
-                }
+    createApp({
+        data() {
+            return {
+                currentDate: new Date().toLocaleDateString('ar-SA', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' }),
+                showAddModal: false,
+                isLoading: true,
+                isSaving: false,
+                newStudent: { name: '', studentId: '', color: 'green' },
+                students: [],
+                refreshInterval: null
             }
-        }).mount('#app');
-    </script>
+        },
+        computed: {
+            // نستخدم فقط الطلاب الذين لديهم اسم ومعرف صحيح
+            validStudents() { return this.students.filter(s => s.name && s.id); },
+            achievementStudents() { return this.validStudents.filter(s => s.achievement).length; },
+            cooperationStudents() { return this.validStudents.filter(s => s.cooperation).length; },
+            participationStudents() { return this.validStudents.filter(s => s.participation).length; },
+            participation2Students() { return this.validStudents.filter(s => s.participation2).length; },
+            participation3Students() { return this.validStudents.filter(s => s.participation3).length; },
+            achievementPercentage() { return this.calcPercent(this.achievementStudents); },
+            cooperationPercentage() { return this.calcPercent(this.cooperationStudents); },
+            participationPercentage() { return this.calcPercent(this.participationStudents); },
+            participation2Percentage() { return this.calcPercent(this.participation2Students); },
+            participation3Percentage() { return this.calcPercent(this.participation3Students); }
+        },
+        methods: {
+            calcPercent(count) { 
+                const total = this.validStudents.length;
+                return total ? Math.round((count / total) * 100) : 0; 
+            },
+            toggleStatus(student, status) { 
+                student[status] = !student[status]; 
+                this.saveToCloud(); 
+            },
+            studentClass(color) { return 'student-' + color; },
+            
+            // جلب وتنظيف البيانات
+            async loadFromCloud() {
+                if (this.isSaving) return;
+                try {
+                    const response = await fetch(`${API_URL}/latest`, {
+                        headers: { 'X-Master-Key': MASTER_KEY }
+                    });
+                    if (!response.ok) throw new Error('فشل الاتصال بالخادم');
+                    
+                    const data = await response.json();
+                    let raw = data.record;
+                    
+                    // تنظيف ذكي: نتأكد أنها مصفوفة ونزيل أي بيانات وهمية
+                    if (Array.isArray(raw)) {
+                        this.students = raw.filter(s => s && typeof s === 'object' && s.name && s.id);
+                    } else if (raw && typeof raw === 'object') {
+                        // لو الـ Bin مخزن كـ object بدل array
+                        this.students = [raw].filter(s => s && s.name && s.id);
+                    } else {
+                        this.students = [];
+                    }
+                } catch (error) {
+                    console.error('خطأ تحميل:', error);
+                } finally {
+                    this.isLoading = false;
+                }
+            },
+
+            // حفظ آمن مع تنظيف مسبق
+            async saveToCloud() {
+                if (this.isSaving) return;
+                this.isSaving = true;
+                this.isLoading = true;
+                
+                try {
+                    // نرسل فقط الطلاب الصالحين
+                    const payload = JSON.stringify(this.validStudents);
+                    
+                    const response = await fetch(API_URL, {
+                        method: 'PUT',
+                        headers: { 
+                            'Content-Type': 'application/json',
+                            'X-Master-Key': MASTER_KEY
+                        },
+                        body: payload
+                    });
+                    
+                    if (!response.ok) {
+                        const errText = await response.text();
+                        throw new Error(errText || 'رفض الخادم العملية');
+                    }
+                    console.log('✅ تم الحفظ بنجاح');
+                } catch (error) {
+                    console.error('❌ فشل الحفظ:', error);
+                    alert('فشل الحفظ: ' + error.message);
+                } finally {
+                    this.isSaving = false;
+                    this.isLoading = false;
+                }
+            },
+
+            async addStudent() {
+                if (!this.newStudent.name.trim() || !this.newStudent.studentId.trim()) {
+                    alert('الرجاء إدخال اسم الطالب ورقمه بشكل صحيح');
+                    return;
+                }
+                
+                const newStudent = {
+                    id: Date.now().toString(), // نص لتجنب مشاكل الأرقام الكبيرة
+                    name: this.newStudent.name.trim(),
+                    studentId: this.newStudent.studentId.trim(),
+                    color: this.newStudent.color,
+                    achievement: false, cooperation: false, participation: false, 
+                    participation2: false, participation3: false, notes: ''
+                };
+                
+                this.students.push(newStudent);
+                await this.saveToCloud();
+                
+                this.newStudent = { name: '', studentId: '', color: 'green' };
+                this.showAddModal = false;
+            },
+
+            async deleteStudent(student) {
+                if (!confirm('حذف هذا الطالب؟')) return;
+                const idx = this.students.findIndex(s => s.id === student.id);
+                if (idx !== -1) {
+                    this.students.splice(idx, 1);
+                    await this.saveToCloud();
+                }
+            },
+
+            async clearAllData() {
+                if (!confirm('⚠️ حذف جميع البيانات نهائياً؟')) return;
+                this.students = [];
+                await this.saveToCloud();
+                await this.loadFromCloud(); // تأكيد المسح
+            },
+
+            startSync() {
+                this.refreshInterval = setInterval(() => {
+                    if (!this.isSaving) this.loadFromCloud();
+                }, 10000);
+            }
+        },
+        mounted() {
+            this.loadFromCloud();
+            this.startSync();
+        },
+        beforeUnmount() {
+            if (this.refreshInterval) clearInterval(this.refreshInterval);
+        }
+    }).mount('#app');
+</script>
 </body>
 </html>
