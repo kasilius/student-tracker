@@ -127,7 +127,7 @@
             }
         },
         computed: {
-            // نستخدم فقط الطلاب الذين لديهم اسم ومعرف صحيح
+            // فقط الطلاب المكتملون (اسم + معرف)
             validStudents() { return this.students.filter(s => s.name && s.id); },
             achievementStudents() { return this.validStudents.filter(s => s.achievement).length; },
             cooperationStudents() { return this.validStudents.filter(s => s.cooperation).length; },
@@ -151,7 +151,6 @@
             },
             studentClass(color) { return 'student-' + color; },
             
-            // جلب وتنظيف البيانات
             async loadFromCloud() {
                 if (this.isSaving) return;
                 try {
@@ -161,51 +160,49 @@
                     if (!response.ok) throw new Error('فشل الاتصال بالخادم');
                     
                     const data = await response.json();
-                    let raw = data.record;
+                    const raw = data.record;
                     
-                    // تنظيف ذكي: نتأكد أنها مصفوفة ونزيل أي بيانات وهمية
-                    if (Array.isArray(raw)) {
-                        this.students = raw.filter(s => s && typeof s === 'object' && s.name && s.id);
-                    } else if (raw && typeof raw === 'object') {
-                        // لو الـ Bin مخزن كـ object بدل array
-                        this.students = [raw].filter(s => s && s.name && s.id);
-                    } else {
-                        this.students = [];
-                    }
+                    // قراءة ذكية: تدعم الصيغة القديمة [] والصيغة الجديدة {students: []}
+                    let loaded = [];
+                    if (Array.isArray(raw)) loaded = raw;
+                    else if (raw && raw.students && Array.isArray(raw.students)) loaded = raw.students;
+                    
+                    this.students = loaded.filter(s => s && typeof s === 'object' && s.name && s.id);
                 } catch (error) {
-                    console.error('خطأ تحميل:', error);
+                    console.error('❌ خطأ تحميل:', error);
                 } finally {
                     this.isLoading = false;
                 }
             },
 
-            // حفظ آمن مع تنظيف مسبق
             async saveToCloud() {
                 if (this.isSaving) return;
                 this.isSaving = true;
                 this.isLoading = true;
                 
                 try {
-                    // نرسل فقط الطلاب الصالحين
-                    const payload = JSON.stringify(this.validStudents);
+                    // نرسل البيانات داخل كائن موحد لمنع أخطاء JSONBin
+                    const payload = JSON.stringify({ students: this.validStudents });
                     
                     const response = await fetch(API_URL, {
                         method: 'PUT',
                         headers: { 
                             'Content-Type': 'application/json',
-                            'X-Master-Key': MASTER_KEY
+                            'X-Master-Key': MASTER_KEY,
+                            'X-Bin-Meta': 'false'
                         },
                         body: payload
                     });
                     
+                    const result = await response.json();
                     if (!response.ok) {
-                        const errText = await response.text();
-                        throw new Error(errText || 'رفض الخادم العملية');
+                        console.error('📥 رد JSONBin:', result);
+                        throw new Error(result.message || result.error || 'الخادم رفض العملية');
                     }
                     console.log('✅ تم الحفظ بنجاح');
                 } catch (error) {
                     console.error('❌ فشل الحفظ:', error);
-                    alert('فشل الحفظ: ' + error.message);
+                    alert('⚠️ فشل الحفظ: ' + error.message);
                 } finally {
                     this.isSaving = false;
                     this.isLoading = false;
@@ -214,12 +211,12 @@
 
             async addStudent() {
                 if (!this.newStudent.name.trim() || !this.newStudent.studentId.trim()) {
-                    alert('الرجاء إدخال اسم الطالب ورقمه بشكل صحيح');
+                    alert('الرجاء إدخال اسم الطالب ورقمه');
                     return;
                 }
                 
                 const newStudent = {
-                    id: Date.now().toString(), // نص لتجنب مشاكل الأرقام الكبيرة
+                    id: Date.now().toString(),
                     name: this.newStudent.name.trim(),
                     studentId: this.newStudent.studentId.trim(),
                     color: this.newStudent.color,
@@ -244,10 +241,12 @@
             },
 
             async clearAllData() {
-                if (!confirm('⚠️ حذف جميع البيانات نهائياً؟')) return;
-                this.students = [];
-                await this.saveToCloud();
-                await this.loadFromCloud(); // تأكيد المسح
+                if (!confirm('⚠️ هل أنت متأكد من حذف جميع البيانات؟')) return;
+                
+                this.students = []; // تصفير القائمة
+                await this.saveToCloud(); // حفظ القائمة الفارغة بأمان
+                await this.loadFromCloud(); // تأكيد المزامنة
+                alert('✅ تم حذف جميع البيانات بنجاح');
             },
 
             startSync() {
