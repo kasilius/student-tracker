@@ -167,40 +167,49 @@
                     }, 800);
                 },
 
-                async addStudent() {
-                    if (!this.newStudent.name || !this.newStudent.studentId) return;
-                    this.students.push({
-                        id: Date.now(),
-                        name: this.newStudent.name,
-                        studentId: this.newStudent.studentId,
-                        color: this.newStudent.color,
-                        achievement: false, cooperation: false, participation: false, participation2: false, participation3: false, notes: ''
-                    });
-                    this.newStudent = { name: '', studentId: '', color: 'green' };
-                    this.showAddModal = false;
-                    this.triggerSave();
-                },
-
-                async deleteStudent(student) {
-                    if (confirm('حذف الطالب؟')) {
-                        this.students = this.students.filter(s => s.id !== student.id);
-                        this.triggerSave();
-                    }
-                },
-
-                async clearAllData() {
-                    if (confirm('حذف جميع البيانات؟')) {
-                        this.students = [];
-                        this.triggerSave();
-                    }
-                }
+async addStudent() {
+    if (!this.newStudent.name || !this.newStudent.studentId) {
+        alert('الرجاء إدخال اسم الطالب ورقمه');
+        return;
+    }
+    
+    const newStudent = {
+        id: Date.now(),
+        name: this.newStudent.name,
+        studentId: this.newStudent.studentId,
+        color: this.newStudent.color,
+        achievement: false,
+        cooperation: false,
+        participation: false,
+        participation2: false,
+        participation3: false,
+        notes: ''
+    };
+    
+    // أضف للطالب محلياً فوراً
+    this.students.push(newStudent);
+    
+    // احفظ في السحابة
+    try {
+        await fetch(API_URL, {
+            method: 'PUT',
+            headers: { 
+                'Content-Type': 'application/json', 
+                'X-Master-Key': MASTER_KEY 
             },
-            mounted() {
-                this.loadData();
-                // مزامنة كل 5 ثوانٍ لضمان ظهور التغييرات من الأجهزة الأخرى
-                setInterval(this.loadData, 5000);
-            }
-        }).mount('#app');
+            body: JSON.stringify(this.students)
+        });
+        
+        //成功后 نظّف النموذج
+        this.newStudent = { name: '', studentId: '', color: 'green' };
+        this.showAddModal = false;
+        
+    } catch (err) {
+        alert('فشل الحفظ: ' + err.message);
+        // احذف الطالب إذا فشل الحفظ
+        this.students.pop();
+    }
+}
     </script>
 </body>
 </html>
