@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>متابعة الطلاب - JSONBin</title>
+    <title>متابعة الطلاب</title>
     <script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
     <link href="https://fonts.googleapis.com/css2?family=Tajawal:wght@400;500;700;800&display=swap" rel="stylesheet">
     <style>
@@ -13,6 +13,7 @@
         .controls { background: white; border-radius: 16px; padding: 20px; margin-bottom: 20px; display: flex; gap: 10px; flex-wrap: wrap; align-items: center; justify-content: space-between; }
         .btn { padding: 12px 24px; border: none; border-radius: 10px; font-family: 'Tajawal', sans-serif; font-weight: 600; cursor: pointer; display: flex; align-items: center; gap: 8px; transition: all 0.3s; font-size: 14px; }
         .btn-primary { background: #3b82f6; color: white; }
+        .btn-primary:hover { background: #2563eb; transform: translateY(-2px); }
         .btn-danger { background: #ef4444; color: white; }
         .date-badge { background: #1e293b; color: white; padding: 12px 24px; border-radius: 10px; font-weight: 600; }
         .table-container { background: white; border-radius: 16px; padding: 25px; box-shadow: 0 4px 15px rgba(0,0,0,0.1); overflow-x: auto; }
@@ -59,7 +60,7 @@
                     <button class="btn btn-primary" @click="showAddModal = true">➕ إضافة طالب</button>
                     <button class="btn btn-danger" @click="clearAllData">🗑️ حذف الكل</button>
                 </div>
-                <div class="date-badge"> {{ currentDate }}</div>
+                <div class="date-badge">📅 {{ currentDate }}</div>
             </div>
 
             <div class="table-container">
@@ -71,22 +72,22 @@
                     <div class="stat-item"><span class="stat-icon">⭐</span><div class="stat-info"><span class="stat-name">مشاركة 3</span><span class="stat-value">{{ participation3Percentage }}%</span><span class="stat-count">{{ participation3Students }} طالب</span></div></div>
                 </div>
 
-                <div v-if="isLoading" class="loading">جاري المزامنة...</div>
+                <div v-if="isLoading" class="loading">جاري التحميل...</div>
 
                 <table v-else>
                     <thead>
-                        <tr><th>#</th><th>اسم الطالب</th><th>الإنجاز 🏆</th><th>التعاون 🤝</th><th>المشاركة </th><th>مشاركة 2 💡</th><th>مشاركة 3 ⭐</th><th>ملاحظات</th><th>حذف</th></tr>
+                        <tr><th>#</th><th>اسم الطالب</th><th>الإنجاز 🏆</th><th>التعاون 🤝</th><th>المشاركة ✋</th><th>مشاركة 2 💡</th><th>مشاركة 3 ⭐</th><th>ملاحظات</th><th>حذف</th></tr>
                     </thead>
                     <tbody>
                         <tr v-for="(student, index) in students" :key="student.id">
                             <td>{{ index + 1 }}</td>
                             <td><div class="student-name" :class="studentClass(student.color)"><span class="color-indicator" :class="student.color"></span>{{ student.name }}</div><small style="color: #94a3b8;">{{ student.studentId }}</small></td>
-                            <td><button class="status-btn achievement" :class="{ active: student.achievement }" @click="toggleStatus(student, 'achievement')"></button></td>
+                            <td><button class="status-btn achievement" :class="{ active: student.achievement }" @click="toggleStatus(student, 'achievement')">🏆</button></td>
                             <td><button class="status-btn cooperation" :class="{ active: student.cooperation }" @click="toggleStatus(student, 'cooperation')"></button></td>
                             <td><button class="status-btn participation" :class="{ active: student.participation }" @click="toggleStatus(student, 'participation')">✋</button></td>
                             <td><button class="status-btn participation2" :class="{ active: student.participation2 }" @click="toggleStatus(student, 'participation2')">💡</button></td>
                             <td><button class="status-btn participation3" :class="{ active: student.participation3 }" @click="toggleStatus(student, 'participation3')">⭐</button></td>
-                            <td><input type="text" v-model="student.notes" class="notes-input" @blur="triggerSave" placeholder="أضف ملاحظة..."></td>
+                            <td><input type="text" v-model="student.notes" class="notes-input" @blur="saveToCloud" placeholder="أضف ملاحظة..."></td>
                             <td><button class="delete-btn" @click="deleteStudent(student)">🗑️</button></td>
                         </tr>
                     </tbody>
@@ -99,7 +100,7 @@
                 <h2>➕ إضافة طالب جديد</h2>
                 <div class="form-group"><label>اسم الطالب</label><input type="text" v-model="newStudent.name" placeholder="أدخل اسم الطالب"></div>
                 <div class="form-group"><label>رقم الطالب</label><input type="text" v-model="newStudent.studentId" placeholder="أدخل رقم الطالب"></div>
-                <div class="form-group"><label>التصنيف</label><select v-model="newStudent.color"><option value="green"> متفوق (أخضر)</option><option value="yellow">🟡 متوسط (أصفر)</option><option value="red">🔴 يحتاج دعم (أحمر)</option></select></div>
+                <div class="form-group"><label>التصنيف</label><select v-model="newStudent.color"><option value="green">🟢 متفوق (أخضر)</option><option value="yellow">🟡 متوسط (أصفر)</option><option value="red">🔴 يحتاج دعم (أحمر)</option></select></div>
                 <div class="modal-actions"><button class="btn" style="background:#64748b;color:white" @click="showAddModal = false">إلغاء</button><button class="btn btn-primary" @click="addStudent">إضافة</button></div>
             </div>
         </div>
@@ -107,7 +108,7 @@
 
     <script>
         // ⚠️ ضع بيانات JSONBin هنا
-        const BIN_ID = 'Y69fe0a8f250b1311c3211460';
+        const BIN_ID = '69fe0a8f250b1311c3211460';
         const MASTER_KEY = '$2a$10$raOJsTvWlksftZDI6t2.le12jC6bNEmslW3FR1h5FBeKo2WaimfEi';
         const API_URL = `https://api.jsonbin.io/v3/b/${BIN_ID}`;
 
@@ -119,9 +120,10 @@
                     currentDate: new Date().toLocaleDateString('ar-SA', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' }),
                     showAddModal: false,
                     isLoading: true,
+                    isSaving: false,
                     newStudent: { name: '', studentId: '', color: 'green' },
                     students: [],
-                    saveTimer: null
+                    refreshInterval: null
                 }
             },
             computed: {
@@ -138,78 +140,135 @@
             },
             methods: {
                 calcPercent(count) { return this.students.length ? Math.round((count / this.students.length) * 100) : 0; },
-                toggleStatus(student, status) { student[status] = !student[status]; this.triggerSave(); },
+                toggleStatus(student, status) { 
+                    student[status] = !student[status]; 
+                    this.saveToCloud(); 
+                },
                 studentClass(color) { return 'student-' + color; },
                 
-                // جلب البيانات
-                async loadData() {
+                // جلب البيانات من السحابة
+                async loadFromCloud() {
+                    if (this.isSaving) return; // لا تحمل أثناء الحفظ
+                    
                     try {
-                        const res = await fetch(`${API_URL}/latest`, { headers: { 'X-Master-Key': MASTER_KEY } });
-                        const data = await res.json();
+                        const response = await fetch(`${API_URL}/latest`, {
+                            headers: { 'X-Master-Key': MASTER_KEY }
+                        });
+                        
+                        if (!response.ok) throw new Error('فشل في الاتصال');
+                        
+                        const data = await response.json();
                         this.students = data.record || [];
-                    } catch (err) { console.error('فشل التحميل', err); }
-                    finally { this.isLoading = false; }
+                    } catch (error) {
+                        console.error('خطأ في التحميل:', error);
+                    } finally {
+                        this.isLoading = false;
+                    }
                 },
 
-                // حفظ البيانات (مع تأخير لتجنب حدود الـ API)
-                triggerSave() {
-                    clearTimeout(this.saveTimer);
+                // حفظ البيانات للسحابة
+                async saveToCloud() {
+                    if (this.isSaving) return; // منع الحفظ المتكرر
+                    
+                    this.isSaving = true;
                     this.isLoading = true;
-                    this.saveTimer = setTimeout(async () => {
-                        try {
-                            await fetch(API_URL, {
-                                method: 'PUT',
-                                headers: { 'Content-Type': 'application/json', 'X-Master-Key': MASTER_KEY },
-                                body: JSON.stringify(this.students)
-                            });
-                        } catch (err) { alert('فشل الحفظ: ' + err.message); }
-                        finally { this.isLoading = false; }
-                    }, 800);
+                    
+                    try {
+                        const response = await fetch(API_URL, {
+                            method: 'PUT',
+                            headers: { 
+                                'Content-Type': 'application/json',
+                                'X-Master-Key': MASTER_KEY,
+                                'X-Bin-Meta': 'false'
+                            },
+                            body: JSON.stringify(this.students)
+                        });
+                        
+                        if (!response.ok) throw new Error('فشل في الحفظ');
+                        
+                        console.log('✅ تم الحفظ بنجاح');
+                    } catch (error) {
+                        console.error('❌ خطأ في الحفظ:', error);
+                        alert('فشل الحفظ: ' + error.message);
+                    } finally {
+                        this.isSaving = false;
+                        this.isLoading = false;
+                    }
                 },
 
-async addStudent() {
-    if (!this.newStudent.name || !this.newStudent.studentId) {
-        alert('الرجاء إدخال اسم الطالب ورقمه');
-        return;
-    }
-    
-    const newStudent = {
-        id: Date.now(),
-        name: this.newStudent.name,
-        studentId: this.newStudent.studentId,
-        color: this.newStudent.color,
-        achievement: false,
-        cooperation: false,
-        participation: false,
-        participation2: false,
-        participation3: false,
-        notes: ''
-    };
-    
-    // أضف للطالب محلياً فوراً
-    this.students.push(newStudent);
-    
-    // احفظ في السحابة
-    try {
-        await fetch(API_URL, {
-            method: 'PUT',
-            headers: { 
-                'Content-Type': 'application/json', 
-                'X-Master-Key': MASTER_KEY 
+                // إضافة طالب جديد
+                async addStudent() {
+                    if (!this.newStudent.name || !this.newStudent.studentId) {
+                        alert('الرجاء إدخال اسم الطالب ورقمه');
+                        return;
+                    }
+                    
+                    const newStudent = {
+                        id: Date.now(),
+                        name: this.newStudent.name,
+                        studentId: this.newStudent.studentId,
+                        color: this.newStudent.color,
+                        achievement: false,
+                        cooperation: false,
+                        participation: false,
+                        participation2: false,
+                        participation3: false,
+                        notes: ''
+                    };
+                    
+                    // أضف محلياً فوراً
+                    this.students.push(newStudent);
+                    
+                    // احفظ في السحابة
+                    await this.saveToCloud();
+                    
+                    // نظّف النموذج
+                    this.newStudent = { name: '', studentId: '', color: 'green' };
+                    this.showAddModal = false;
+                },
+
+                // حذف طالب
+                async deleteStudent(student) {
+                    if (!confirm('هل أنت متأكد من حذف هذا الطالب؟')) return;
+                    
+                    const index = this.students.findIndex(s => s.id === student.id);
+                    if (index === -1) return;
+                    
+                    // احذف محلياً
+                    this.students.splice(index, 1);
+                    
+                    // احفظ في السحابة
+                    await this.saveToCloud();
+                },
+
+                // حذف جميع البيانات
+                async clearAllData() {
+                    if (!confirm('⚠️ هل أنت متأكد من حذف جميع البيانات؟ هذا الإجراء لا يمكن التراجع عنه!')) return;
+                    
+                    this.students = [];
+                    await this.saveToCloud();
+                },
+
+                // بدء المزامنة الدورية
+                startSync() {
+                    // حدّث كل 10 ثوانٍ (بدلاً من 5 لتجنب الضغط على API)
+                    this.refreshInterval = setInterval(() => {
+                        if (!this.isSaving) {
+                            this.loadFromCloud();
+                        }
+                    }, 10000);
+                }
             },
-            body: JSON.stringify(this.students)
-        });
-        
-        //成功后 نظّف النموذج
-        this.newStudent = { name: '', studentId: '', color: 'green' };
-        this.showAddModal = false;
-        
-    } catch (err) {
-        alert('فشل الحفظ: ' + err.message);
-        // احذف الطالب إذا فشل الحفظ
-        this.students.pop();
-    }
-}
+            mounted() {
+                this.loadFromCloud();
+                this.startSync();
+            },
+            beforeUnmount() {
+                if (this.refreshInterval) {
+                    clearInterval(this.refreshInterval);
+                }
+            }
+        }).mount('#app');
     </script>
 </body>
 </html>
