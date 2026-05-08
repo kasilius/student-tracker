@@ -1,0 +1,241 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>متابعة الطلاب - Supabase</title>
+    <script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Tajawal:wght@400;500;700;800&display=swap" rel="stylesheet">
+    <style>
+        /* نفس التنسيقات السابقة لضمان شكل التطبيق */
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: 'Tajawal', sans-serif; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); min-height: 100vh; padding: 20px; }
+        .container { max-width: 1400px; margin: 0 auto; }
+        .controls { background: white; border-radius: 16px; padding: 20px; margin-bottom: 20px; display: flex; gap: 10px; flex-wrap: wrap; align-items: center; justify-content: space-between; }
+        .btn { padding: 12px 24px; border: none; border-radius: 10px; font-family: 'Tajawal', sans-serif; font-weight: 600; cursor: pointer; display: flex; align-items: center; gap: 8px; transition: all 0.3s; font-size: 14px; }
+        .btn-primary { background: #3b82f6; color: white; }
+        .btn-secondary { background: #64748b; color: white; }
+        .date-badge { background: #1e293b; color: white; padding: 12px 24px; border-radius: 10px; font-weight: 600; display: flex; align-items: center; gap: 10px; }
+        .table-container { background: white; border-radius: 16px; padding: 25px; box-shadow: 0 4px 15px rgba(0,0,0,0.1); overflow-x: auto; }
+        .stats-row { display: flex; align-items: center; justify-content: space-around; gap: 15px; padding: 15px; background: #f8fafc; border-radius: 12px; margin-bottom: 20px; flex-wrap: wrap; }
+        .stat-item { display: flex; align-items: center; gap: 10px; padding: 10px 20px; background: white; border-radius: 10px; box-shadow: 0 2px 8px rgba(0,0,0,0.05); }
+        .stat-icon { font-size: 24px; }
+        .stat-info { display: flex; flex-direction: column; }
+        .stat-name { font-size: 13px; color: #64748b; font-weight: 500; }
+        .stat-value { font-size: 20px; font-weight: 800; color: #1e293b; }
+        .stat-count { font-size: 12px; color: #94a3b8; }
+        table { width: 100%; border-collapse: collapse; }
+        th { background: #f8fafc; padding: 15px; text-align: right; font-weight: 700; color: #475569; border-bottom: 2px solid #e2e8f0; white-space: nowrap; }
+        td { padding: 15px; border-bottom: 1px solid #f1f5f9; vertical-align: middle; }
+        tr:hover { background: #f8fafc; }
+        .student-name { font-weight: 700; font-size: 16px; display: flex; align-items: center; gap: 10px; }
+        .color-indicator { width: 12px; height: 12px; border-radius: 50%; display: inline-block; }
+        .green { background: #10b981; } .yellow { background: #f59e0b; } .red { background: #ef4444; }
+        .student-green { color: #10b981; } .student-yellow { color: #f59e0b; } .student-red { color: #ef4444; }
+        .status-btn { width: 40px; height: 40px; border: none; border-radius: 10px; cursor: pointer; font-size: 20px; transition: all 0.3s; background: #f1f5f9; }
+        .status-btn.active { transform: scale(1.1); }
+        .status-btn.achievement.active { background: #dbeafe; }
+        .status-btn.cooperation.active { background: #dcfce7; }
+        .status-btn.participation.active { background: #fef3c7; }
+        .status-btn.participation2.active { background: #fee2e2; }
+        .status-btn.participation3.active { background: #f3e8ff; }
+        .notes-input { width: 100%; padding: 8px 12px; border: 1px solid #e2e8f0; border-radius: 8px; font-family: 'Tajawal', sans-serif; font-size: 14px; }
+        .modal-overlay { position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.5); display: flex; align-items: center; justify-content: center; z-index: 1000; }
+        .modal { background: white; border-radius: 20px; padding: 30px; width: 90%; max-width: 500px; animation: slideIn 0.3s; }
+        @keyframes slideIn { from { transform: translateY(-50px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
+        .modal h2 { margin-bottom: 20px; color: #1e293b; }
+        .form-group { margin-bottom: 20px; }
+        .form-group label { display: block; margin-bottom: 8px; font-weight: 600; color: #475569; }
+        .form-group input, .form-group select { width: 100%; padding: 12px; border: 2px solid #e2e8f0; border-radius: 10px; font-family: 'Tajawal', sans-serif; font-size: 16px; }
+        .modal-actions { display: flex; gap: 10px; justify-content: flex-end; }
+        .delete-btn { background: #fee2e2; color: #ef4444; border: none; width: 36px; height: 36px; border-radius: 8px; cursor: pointer; font-size: 18px; }
+        .loading { text-align: center; padding: 20px; color: #3b82f6; font-weight: bold; }
+        @media (max-width: 768px) {
+            .controls { flex-direction: column; }
+            .stats-row { flex-direction: column; gap: 10px; }
+            table { font-size: 12px; }
+            .status-btn { width: 32px; height: 32px; font-size: 16px; }
+        }
+    </style>
+</head>
+<body>
+    <div id="app">
+        <div class="container">
+            <div class="controls">
+                <div style="display: flex; gap: 10px;">
+                    <button class="btn btn-primary" @click="showAddModal = true">➕ إضافة طالب</button>
+                    <button class="btn btn-secondary" @click="clearAllData" style="background:#ef4444">🗑️ حذف الكل</button>
+                </div>
+                <div class="date-badge"> {{ currentDate }}</div>
+            </div>
+
+            <div class="table-container">
+                <div class="stats-row">
+                    <div class="stat-item"><span class="stat-icon">🏆</span><div class="stat-info"><span class="stat-name">الإنجاز</span><span class="stat-value">{{ achievementPercentage }}%</span><span class="stat-count">{{ achievementStudents }} طالب</span></div></div>
+                    <div class="stat-item"><span class="stat-icon">🤝</span><div class="stat-info"><span class="stat-name">التعاون</span><span class="stat-value">{{ cooperationPercentage }}%</span><span class="stat-count">{{ cooperationStudents }} طالب</span></div></div>
+                    <div class="stat-item"><span class="stat-icon">✋</span><div class="stat-info"><span class="stat-name">المشاركة</span><span class="stat-value">{{ participationPercentage }}%</span><span class="stat-count">{{ participationStudents }} طالب</span></div></div>
+                    <div class="stat-item"><span class="stat-icon">💡</span><div class="stat-info"><span class="stat-name">مشاركة 2</span><span class="stat-value">{{ participation2Percentage }}%</span><span class="stat-count">{{ participation2Students }} طالب</span></div></div>
+                    <div class="stat-item"><span class="stat-icon">⭐</span><div class="stat-info"><span class="stat-name">مشاركة 3</span><span class="stat-value">{{ participation3Percentage }}%</span><span class="stat-count">{{ participation3Students }} طالب</span></div></div>
+                </div>
+
+                <div v-if="isLoading" class="loading">جاري المزامنة اللحظية...</div>
+
+                <table v-else>
+                    <thead>
+                        <tr>
+                            <th>#</th><th>اسم الطالب</th><th>الإنجاز </th><th>التعاون 🤝</th><th>المشاركة ✋</th><th>مشاركة 2 💡</th><th>مشاركة 3 ⭐</th><th>ملاحظات</th><th>حذف</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr v-for="(student, index) in students" :key="student.id">
+                            <td>{{ index + 1 }}</td>
+                            <td>
+                                <div class="student-name" :class="studentClass(student.color)">
+                                    <span class="color-indicator" :class="student.color"></span>
+                                    {{ student.name }}
+                                </div>
+                                <small style="color: #94a3b8;">{{ student.studentId }}</small>
+                            </td>
+                            <td><button class="status-btn achievement" :class="{ active: student.achievement }" @click="toggleStatus(student, 'achievement')">🏆</button></td>
+                            <td><button class="status-btn cooperation" :class="{ active: student.cooperation }" @click="toggleStatus(student, 'cooperation')">🤝</button></td>
+                            <td><button class="status-btn participation" :class="{ active: student.participation }" @click="toggleStatus(student, 'participation')">✋</button></td>
+                            <td><button class="status-btn participation2" :class="{ active: student.participation2 }" @click="toggleStatus(student, 'participation2')">💡</button></td>
+                            <td><button class="status-btn participation3" :class="{ active: student.participation3 }" @click="toggleStatus(student, 'participation3')">⭐</button></td>
+                            <td><input type="text" v-model="student.notes" class="notes-input" @blur="updateStudent(student)" placeholder="أضف ملاحظة..."></td>
+                            <td><button class="delete-btn" @click="deleteStudent(student)">🗑️</button></td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <div class="modal-overlay" v-if="showAddModal" @click.self="showAddModal = false">
+            <div class="modal">
+                <h2>➕ إضافة طالب جديد</h2>
+                <div class="form-group"><label>اسم الطالب</label><input type="text" v-model="newStudent.name" placeholder="أدخل اسم الطالب"></div>
+                <div class="form-group"><label>رقم الطالب</label><input type="text" v-model="newStudent.studentId" placeholder="أدخل رقم الطالب"></div>
+                <div class="form-group"><label>التصنيف</label>
+                    <select v-model="newStudent.color">
+                        <option value="green"> متفوق (أخضر)</option>
+                        <option value="yellow">🟡 متوسط (أصفر)</option>
+                        <option value="red">🔴 يحتاج دعم (أحمر)</option>
+                    </select>
+                </div>
+                <div class="modal-actions">
+                    <button class="btn btn-secondary" @click="showAddModal = false">إلغاء</button>
+                    <button class="btn btn-primary" @click="addStudent">إضافة</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // ==========================================
+        // ⚠️ 1. ضع بيانات Supabase الخاصة بك هنا
+        // ==========================================
+        const SUPABASE_URL = 'https://qieblypzcvpeuqfrjclh.supabase.co
+';
+        const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFpZWJseXB6Y3ZwZXVxZnJqY2xoIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzgyNDE3NDYsImV4cCI6MjA5MzgxNzc0Nn0.cB3PuRfZhiWlNI2Qvf_pGW5YKgTnqpUNE2WALBgY3I0
+';
+        
+        const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+
+        const { createApp } = Vue;
+
+        createApp({
+            data() {
+                return {
+                    currentDate: new Date().toLocaleDateString('ar-SA', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' }),
+                    showAddModal: false,
+                    isLoading: true,
+                    newStudent: { name: '', studentId: '', color: 'green' },
+                    students: []
+                }
+            },
+            computed: {
+                achievementStudents() { return this.students.filter(s => s.achievement).length; },
+                cooperationStudents() { return this.students.filter(s => s.cooperation).length; },
+                participationStudents() { return this.students.filter(s => s.participation).length; },
+                participation2Students() { return this.students.filter(s => s.participation2).length; },
+                participation3Students() { return this.students.filter(s => s.participation3).length; },
+                achievementPercentage() { return this.calcPercent(this.achievementStudents); },
+                cooperationPercentage() { return this.calcPercent(this.cooperationStudents); },
+                participationPercentage() { return this.calcPercent(this.participationStudents); },
+                participation2Percentage() { return this.calcPercent(this.participation2Students); },
+                participation3Percentage() { return this.calcPercent(this.participation3Students); }
+            },
+            methods: {
+                calcPercent(count) { return this.students.length ? Math.round((count / this.students.length) * 100) : 0; },
+                toggleStatus(student, status) {
+                    student[status] = !student[status];
+                    this.updateStudent(student);
+                },
+                studentClass(color) { return `student-${color}`; },
+                
+                async addStudent() {
+                    if (!this.newStudent.name || !this.newStudent.studentId) return;
+                    const { error } = await supabase.from('students').insert({
+                        name: this.newStudent.name,
+                        studentId: this.newStudent.studentId,
+                        color: this.newStudent.color,
+                        achievement: false, cooperation: false, participation: false, participation2: false, participation3: false, notes: '',
+                        created_at: new Date().toISOString()
+                    });
+                    if (!error) {
+                        this.newStudent = { name: '', studentId: '', color: 'green' };
+                        this.showAddModal = false;
+                    } else alert('خطأ: ' + error.message);
+                },
+
+                async updateStudent(student) {
+                    const { error } = await supabase.from('students').update(student).eq('id', student.id);
+                    if (error) console.error('Update error:', error);
+                },
+
+                async deleteStudent(student) {
+                    if (confirm('حذف الطالب؟')) {
+                        const { error } = await supabase.from('students').delete().eq('id', student.id);
+                        if (error) alert('خطأ: ' + error.message);
+                    }
+                },
+
+                async clearAllData() {
+                    if (confirm('حذف جميع البيانات؟')) {
+                        this.isLoading = true;
+                        const { error } = await supabase.from('students').delete().neq('id', 0); // يحذف الكل
+                        if (!error) this.isLoading = false;
+                        else alert('خطأ: ' + error.message);
+                    }
+                },
+
+                setupRealtime() {
+                    // 1. تحميل البيانات الأولية
+                    supabase.from('students').select('*').order('created_at', { ascending: true })
+                        .then(({ data, error }) => {
+                            if (!error) this.students = data || [];
+                            this.isLoading = false;
+                        });
+
+                    // 2. الاستماع للتغييرات اللحظية
+                    supabase.channel('students_channel')
+                        .on('postgres_changes', { event: '*', schema: 'public', table: 'students' }, payload => {
+                            if (payload.eventType === 'INSERT') this.students.push(payload.new);
+                            if (payload.eventType === 'UPDATE') {
+                                const idx = this.students.findIndex(s => s.id === payload.new.id);
+                                if (idx !== -1) this.students.splice(idx, 1, payload.new);
+                            }
+                            if (payload.eventType === 'DELETE') {
+                                this.students = this.students.filter(s => s.id !== payload.old.id);
+                            }
+                        })
+                        .subscribe();
+                }
+            },
+            mounted() {
+                this.setupRealtime();
+            }
+        }).mount('#app');
+    </script>
+</body>
+</html>
